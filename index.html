@@ -120,98 +120,40 @@
   <div id="task-list"></div>
   <button id="addBtn">+ Añadir tarea</button>
   <button onclick="exportCSV()">↓ Exportar CSV</button>
-  <button onclick="openConfirm()">🗑 Borrar todo</button>
+  <button onclick="clearTasks()">🗑 Borrar todo</button>
   <div id="total">Total: 00:00:00</div>
-
-  <div id="modal-bg">
-    <div id="modal">
-      <h2 id="modal-title">Nueva tarea</h2>
-      <input type="text" id="modal-input" placeholder="Nombre de la tarea" />
-      <input type="text" id="modal-time" placeholder="Tiempo (opcional, hh:mm:ss)" />
-      <div id="modal-buttons">
-        <button id="cancelBtn">Cancelar</button>
-        <button id="confirmBtn">Aceptar</button>
-      </div>
-    </div>
-  </div>
-
-  <div id="confirm-bg">
-    <div id="confirm-box">
-      <p>¿Seguro que quieres borrar todas las tareas?</p>
-      <div id="confirm-buttons">
-        <button onclick="closeConfirm()">Cancelar</button>
-        <button onclick="confirmClear()">Aceptar</button>
-      </div>
-    </div>
-  </div>
 
   <script>
     let tasks = [];
-    let editingIndex = null;
 
-    document.addEventListener("DOMContentLoaded", () => {
-      document.getElementById('addBtn').addEventListener('click', () => openModal());
-      document.getElementById('confirmBtn').addEventListener('click', confirmModal);
-      document.getElementById('cancelBtn').addEventListener('click', closeModal);
-      document.getElementById('modal-input').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') confirmModal();
-      });
-      document.getElementById('modal-time').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') confirmModal();
-      });
+    document.getElementById('addBtn').addEventListener('click', () => {
+      const name = prompt("Nombre de la tarea:");
+      if (name) {
+        tasks.push({ name, time: '00:00:00' });
+        renderTasks();
+      }
     });
 
-    function openModal(index = null) {
-      editingIndex = index;
-      document.getElementById('modal-title').textContent = index === null ? 'Nueva tarea' : 'Editar tarea';
-      document.getElementById('modal-input').value = index === null ? '' : tasks[index].name;
-      document.getElementById('modal-time').value = index === null ? '' : tasks[index].time;
-      document.getElementById('modal-bg').style.display = 'flex';
-      setTimeout(() => document.getElementById('modal-input').focus(), 100);
+    function renderTasks() {
+      const taskList = document.getElementById('task-list');
+      taskList.innerHTML = '';
+      tasks.forEach((task, i) => {
+        const div = document.createElement('div');
+        div.className = 'task';
+        div.innerHTML = `
+          <input type="text" value="${task.name}" readonly />
+          <div class="task-time">${task.time}</div>
+        `;
+        taskList.appendChild(div);
+      });
     }
 
-    function closeModal() {
-      document.getElementById('modal-bg').style.display = 'none';
-    }
-
-    function confirmModal() {
-      const name = document.getElementById('modal-input').value.trim();
-      const time = document.getElementById('modal-time').value.trim();
-      if (!name) return;
-
-      if (editingIndex === null) {
-        tasks.push({ name, time: time || '00:00:00', seconds: timeToSeconds(time || '00:00:00') });
-      } else {
-        tasks[editingIndex].name = name;
-        if (time) {
-          tasks[editingIndex].time = time;
-          tasks[editingIndex].seconds = timeToSeconds(time);
-        }
+    function clearTasks() {
+      const confirmClear = confirm("¿Seguro que quieres borrar todas las tareas?");
+      if (confirmClear) {
+        tasks = [];
+        renderTasks();
       }
-      closeModal();
-      saveTasks();
-    }
-
-    function timeToSeconds(t) {
-      const parts = t.split(':').map(Number);
-      return (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
-    }
-
-    function saveTasks() {
-      localStorage.setItem('tasks', JSON.stringify(tasks));
-      location.reload();
-    }
-
-    function openConfirm() {
-      document.getElementById('confirm-bg').style.display = 'flex';
-    }
-    function closeConfirm() {
-      document.getElementById('confirm-bg').style.display = 'none';
-    }
-    function confirmClear() {
-      tasks = [];
-      saveTasks();
-      closeConfirm();
     }
   </script>
 </body>
