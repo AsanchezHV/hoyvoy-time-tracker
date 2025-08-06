@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -66,6 +65,11 @@
       border-radius: 4px;
       font-weight: bold;
     }
+    .icon-button {
+      background: none;
+      color: #000;
+      font-size: 1.1rem;
+    }
     .task-time {
       min-width: 100px;
       text-align: right;
@@ -93,6 +97,7 @@
 
   <script>
     let tasks = JSON.parse(localStorage.getItem('tasks') || '[]');
+    let editingIndex = null;
 
     function formatTime(seconds) {
       const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
@@ -117,6 +122,7 @@
         const nameInput = document.createElement('input');
         nameInput.type = 'text';
         nameInput.value = task.name;
+        nameInput.disabled = editingIndex !== i && task.name !== '';
         nameInput.addEventListener('input', () => {
           tasks[i].name = nameInput.value;
           saveTasks(false);
@@ -131,11 +137,23 @@
         toggleBtn.onclick = () => toggleTimer(i);
 
         const editBtn = document.createElement('button');
-        editBtn.textContent = 'Editar';
+        editBtn.className = 'icon-button';
+        editBtn.innerHTML = '✏️';
         editBtn.onclick = () => {
-          const manual = prompt('Introduce el nuevo tiempo (hh:mm:ss):', formatTime(task.seconds));
-          if (manual && /^\d{2}:\d{2}:\d{2}$/.test(manual)) {
-            task.seconds = parseTime(manual);
+          if (editingIndex === i) {
+            editingIndex = null;
+          } else {
+            editingIndex = i;
+          }
+          saveTasks();
+        };
+
+        const resetBtn = document.createElement('button');
+        resetBtn.className = 'icon-button';
+        resetBtn.innerHTML = '🔄';
+        resetBtn.onclick = () => {
+          if (confirm('¿Reiniciar el tiempo de esta tarea a 00:00:00?')) {
+            task.seconds = 0;
             saveTasks();
           }
         };
@@ -147,7 +165,7 @@
           saveTasks();
         };
 
-        div.append(nameInput, timeLabel, toggleBtn, editBtn, delBtn);
+        div.append(nameInput, timeLabel, toggleBtn, editBtn, resetBtn, delBtn);
         list.appendChild(div);
         total += task.seconds;
       });
@@ -177,7 +195,16 @@
     }
 
     function addTask() {
+      tasks.forEach((task, i) => {
+        if (task.running) {
+          const now = Date.now();
+          task.seconds += Math.floor((now - task.lastStart) / 1000);
+          task.running = false;
+          delete task.lastStart;
+        }
+      });
       tasks.push({ name: '', seconds: 0, running: false });
+      editingIndex = tasks.length - 1;
       saveTasks();
     }
 
@@ -222,6 +249,7 @@
 
     setInterval(() => {
       let needsSave = false;
+      const now = Date.now();
       tasks.forEach(task => {
         if (task.running) {
           task.seconds += 1;
@@ -235,3 +263,4 @@
   </script>
 </body>
 </html>
+
