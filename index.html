@@ -33,12 +33,17 @@
       gap: 0.5rem;
       margin: 0.5rem 0;
     }
-    .task input {
+    .task input[type="text"] {
       flex: 1;
       padding: 0.3rem;
       border: 1px solid #000;
       border-radius: 4px;
       background-color: #fff;
+    }
+    .task-time {
+      min-width: 100px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
     }
     button {
       padding: 0.3rem 0.6rem;
@@ -49,10 +54,9 @@
       border-radius: 4px;
       font-weight: bold;
     }
-    .task-time {
-      min-width: 100px;
-      text-align: right;
-      font-variant-numeric: tabular-nums;
+    .delete-btn {
+      background-color: #000;
+      color: red;
     }
     #total {
       margin-top: 1rem;
@@ -71,7 +75,7 @@
   <div id="task-list"></div>
   <button onclick="addTask()">+ Añadir tarea</button>
   <button onclick="exportCSV()">↓ Exportar CSV</button>
-  <button onclick="clearAll()">🗑️ Borrar todo</button>
+  <button onclick="clearTasks()">🗑️ Borrar todo</button>
   <div id="total">Total: 00:00:00</div>
 
   <script>
@@ -84,6 +88,11 @@
       return `${h}:${m}:${s}`;
     }
 
+    function parseTime(str) {
+      const [h, m, s] = str.split(':').map(n => parseInt(n) || 0);
+      return h * 3600 + m * 60 + s;
+    }
+
     function renderTasks() {
       const list = document.getElementById('task-list');
       list.innerHTML = '';
@@ -93,44 +102,41 @@
         div.className = 'task';
 
         const nameInput = document.createElement('input');
+        nameInput.type = 'text';
         nameInput.value = task.name;
-        nameInput.oninput = (e) => {
-          tasks[i].name = e.target.value;
-          saveTasks(false);
-        };
+        nameInput.oninput = (e) => { tasks[i].name = e.target.value; saveTasks(false); };
 
         const timeLabel = document.createElement('span');
         timeLabel.className = 'task-time';
         timeLabel.textContent = formatTime(task.seconds);
-        timeLabel.id = `task-time-${i}`;
 
         const toggleBtn = document.createElement('button');
         toggleBtn.textContent = task.running ? 'Pausar' : 'Iniciar';
         toggleBtn.onclick = () => toggleTimer(i);
 
-        const delBtn = document.createElement('button');
-        delBtn.textContent = '❌';
-        delBtn.onclick = () => deleteTask(i);
+        const editBtn = document.createElement('button');
+        editBtn.textContent = 'Editar';
+        editBtn.onclick = () => {
+          const nuevo = prompt('Nuevo tiempo (hh:mm:ss):', formatTime(task.seconds));
+          if (nuevo) {
+            tasks[i].seconds = parseTime(nuevo);
+            saveTasks(false);
+          }
+        };
 
-        div.append(nameInput, timeLabel, toggleBtn, delBtn);
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = '❌';
+        deleteBtn.className = 'delete-btn';
+        deleteBtn.onclick = () => {
+          tasks.splice(i, 1);
+          saveTasks(false);
+        };
+
+        div.append(nameInput, timeLabel, toggleBtn, editBtn, deleteBtn);
         list.appendChild(div);
         total += task.seconds;
       });
       document.getElementById('total').textContent = 'Total: ' + formatTime(total);
-    }
-
-    function updateTimes() {
-      let total = 0;
-      tasks.forEach((task, i) => {
-        if (task.running) {
-          task.seconds += 1;
-        }
-        const timeLabel = document.getElementById(`task-time-${i}`);
-        if (timeLabel) timeLabel.textContent = formatTime(task.seconds);
-        total += task.seconds;
-      });
-      document.getElementById('total').textContent = 'Total: ' + formatTime(total);
-      saveTasks(false);
     }
 
     function toggleTimer(index) {
@@ -152,36 +158,33 @@
         }
         return task;
       });
-      saveTasks();
+      saveTasks(false);
     }
 
     function addTask() {
       tasks.push({ name: '', seconds: 0, running: false });
-      saveTasks();
+      saveTasks(false);
     }
 
-    function deleteTask(index) {
-      tasks.splice(index, 1);
-      saveTasks();
-    }
-
-    function clearAll() {
-      if (confirm('¿Borrar todas las tareas?')) {
+    function clearTasks() {
+      if (confirm('¿Estás seguro de borrar todas las tareas?')) {
         tasks = [];
-        saveTasks();
+        saveTasks(false);
       }
     }
 
-    function saveTasks(rerender = true) {
+    function saveTasks(update = true) {
       localStorage.setItem('tasks', JSON.stringify(tasks));
-      if (rerender) renderTasks();
+      if (update) renderTasks();
     }
 
     function exportCSV() {
-      let csv = 'Task,Time\n';
+      let csv = 'Task,Time
+';
       let total = 0;
       tasks.forEach(t => {
-        csv += `${t.name},${formatTime(t.seconds)}\n`;
+        csv += `${t.name},${formatTime(t.seconds)}
+`;
         total += t.seconds;
       });
       csv += `Total,${formatTime(total)}`;
@@ -202,7 +205,15 @@
       }
     }
 
-    setInterval(updateTimes, 1000);
+    setInterval(() => {
+      tasks.forEach(task => {
+        if (task.running) {
+          task.seconds += 1;
+        }
+      });
+      saveTasks();
+    }, 1000);
+
     renderTasks();
   </script>
 </body>
