@@ -162,17 +162,6 @@
       return (h || 0) * 3600 + (m || 0) * 60 + (s || 0);
     }
 
-    function pauseAll() {
-      const now = Date.now();
-      tasks.forEach(task => {
-        if (task.running) {
-          task.seconds += Math.floor((now - task.lastStart) / 1000);
-          task.running = false;
-          delete task.lastStart;
-        }
-      });
-    }
-
     function renderTasks() {
       const list = document.getElementById('task-list');
       list.innerHTML = '';
@@ -228,7 +217,6 @@
         task.running = false;
         delete task.lastStart;
       } else {
-        pauseAll();
         task.lastStart = now;
         task.running = true;
       }
@@ -236,7 +224,6 @@
     }
 
     function openAddModal() {
-      pauseAll();
       modalAction = 'add';
       editIndex = null;
       document.getElementById('modal-title').textContent = 'Nueva tarea';
@@ -247,7 +234,6 @@
     }
 
     function openEditModal(index) {
-      pauseAll();
       modalAction = 'edit';
       editIndex = index;
       document.getElementById('modal-title').textContent = 'Editar tarea';
@@ -342,9 +328,10 @@
     renderTasks();
     setInterval(() => {
       let needsSave = false;
+      const now = Date.now();
       tasks.forEach(task => {
         if (task.running) {
-          task.seconds++;
+          task.seconds += 1;
           needsSave = true;
         }
       });
