@@ -149,6 +149,18 @@
     let tasks = [];
     let editingIndex = null;
 
+    document.addEventListener("DOMContentLoaded", () => {
+      document.getElementById('addBtn').addEventListener('click', () => openModal());
+      document.getElementById('confirmBtn').addEventListener('click', confirmModal);
+      document.getElementById('cancelBtn').addEventListener('click', closeModal);
+      document.getElementById('modal-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') confirmModal();
+      });
+      document.getElementById('modal-time').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') confirmModal();
+      });
+    });
+
     function openModal(index = null) {
       editingIndex = index;
       document.getElementById('modal-title').textContent = index === null ? 'Nueva tarea' : 'Editar tarea';
@@ -201,17 +213,6 @@
       saveTasks();
       closeConfirm();
     }
-
-    document.getElementById('addBtn').addEventListener('click', () => openModal());
-    document.getElementById('confirmBtn').addEventListener('click', confirmModal);
-    document.getElementById('cancelBtn').addEventListener('click', closeModal);
-
-    document.getElementById('modal-input').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') confirmModal();
-    });
-    document.getElementById('modal-time').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') confirmModal();
-    });
   </script>
 </body>
 </html>
