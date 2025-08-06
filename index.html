@@ -75,7 +75,7 @@
       font-size: 1.2rem;
       color: #000;
     }
-    #modal-bg, #confirm-bg {
+    #modal-bg {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
       background: rgba(0,0,0,0.6);
@@ -84,7 +84,7 @@
       align-items: center;
       z-index: 999;
     }
-    #modal, #confirm-box {
+    #modal {
       background: white;
       padding: 2rem;
       border-radius: 8px;
@@ -92,7 +92,7 @@
       width: 100%;
       box-shadow: 0 0 20px rgba(0,0,0,0.2);
     }
-    #modal h2, #confirm-box p {
+    #modal h2 {
       margin-top: 0;
       font-family: 'ProximaNovaCondBlack';
     }
@@ -104,7 +104,7 @@
       border: 1px solid #000;
       border-radius: 4px;
     }
-    #modal-buttons, #confirm-buttons {
+    #modal-buttons {
       display: flex;
       justify-content: flex-end;
       gap: 0.5rem;
@@ -120,41 +120,212 @@
   <div id="task-list"></div>
   <button id="addBtn">+ Añadir tarea</button>
   <button onclick="exportCSV()">↓ Exportar CSV</button>
-  <button onclick="clearTasks()">🗑 Borrar todo</button>
+  <button onclick="clearAll()">🗑 Borrar todo</button>
   <div id="total">Total: 00:00:00</div>
 
+  <div id="modal-bg">
+    <div id="modal">
+      <h2 id="modal-title">Nueva tarea</h2>
+      <input type="text" id="modal-input" placeholder="Nombre de la tarea" />
+      <input type="text" id="modal-time" placeholder="Tiempo (opcional, hh:mm:ss)" />
+      <div id="modal-buttons">
+        <button onclick="closeModal()">Cancelar</button>
+        <button onclick="confirmModal()">Aceptar</button>
+      </div>
+    </div>
+  </div>
+
   <script>
-    let tasks = [];
+    let tasks = JSON.parse(localStorage.getItem('tasks') || '[]');
+    let modalAction = null;
+    let editIndex = null;
 
-    document.getElementById('addBtn').addEventListener('click', () => {
-      const name = prompt("Nombre de la tarea:");
-      if (name) {
-        tasks.push({ name, time: '00:00:00' });
-        renderTasks();
-      }
-    });
+    function formatTime(seconds) {
+      const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
+      const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+      const s = String(seconds % 60).padStart(2, '0');
+      return `${h}:${m}:${s}`;
+    }
 
-    function renderTasks() {
-      const taskList = document.getElementById('task-list');
-      taskList.innerHTML = '';
-      tasks.forEach((task, i) => {
-        const div = document.createElement('div');
-        div.className = 'task';
-        div.innerHTML = `
-          <input type="text" value="${task.name}" readonly />
-          <div class="task-time">${task.time}</div>
-        `;
-        taskList.appendChild(div);
+    function parseTime(str) {
+      const [h, m, s] = str.split(':').map(Number);
+      return h * 3600 + m * 60 + s;
+    }
+
+    function pauseAll() {
+      const now = Date.now();
+      tasks.forEach(task => {
+        if (task.running) {
+          task.seconds += Math.floor((now - task.lastStart) / 1000);
+          task.running = false;
+          delete task.lastStart;
+        }
       });
     }
 
-    function clearTasks() {
-      const confirmClear = confirm("¿Seguro que quieres borrar todas las tareas?");
-      if (confirmClear) {
+    function renderTasks() {
+      const list = document.getElementById('task-list');
+      list.innerHTML = '';
+      let total = 0;
+      tasks.forEach((task, i) => {
+        const div = document.createElement('div');
+        div.className = 'task';
+
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.value = task.name;
+        nameInput.readOnly = true;
+
+        const timeInput = document.createElement('input');
+        timeInput.className = 'task-time';
+        timeInput.value = formatTime(task.seconds);
+        timeInput.readOnly = true;
+
+        const toggleBtn = document.createElement('button');
+        toggleBtn.textContent = task.running ? '⏸️' : '▶️';
+        toggleBtn.onclick = () => toggleTimer(i);
+
+        const editBtn = document.createElement('button');
+        editBtn.textContent = '✏️';
+        editBtn.onclick = () => openEditModal(i);
+
+        const resetBtn = document.createElement('button');
+        resetBtn.textContent = '🔄';
+        resetBtn.onclick = () => {
+          task.seconds = 0;
+          saveTasks();
+        };
+
+        const delBtn = document.createElement('button');
+        delBtn.textContent = '❌';
+        delBtn.onclick = () => {
+          tasks.splice(i, 1);
+          saveTasks();
+        };
+
+        div.append(nameInput, timeInput, toggleBtn, editBtn, resetBtn, delBtn);
+        list.appendChild(div);
+        total += task.seconds;
+      });
+      document.getElementById('total').textContent = 'Total: ' + formatTime(total);
+    }
+
+    function toggleTimer(index) {
+      const now = Date.now();
+      const task = tasks[index];
+      if (task.running) {
+        task.seconds += Math.floor((now - task.lastStart) / 1000);
+        task.running = false;
+        delete task.lastStart;
+      } else {
+        task.lastStart = now;
+        task.running = true;
+      }
+      saveTasks();
+    }
+
+    function openAddModal() {
+      pauseAll();
+      modalAction = 'add';
+      editIndex = null;
+      document.getElementById('modal-title').textContent = 'Nueva tarea';
+      document.getElementById('modal-input').value = '';
+      document.getElementById('modal-time').value = '';
+      document.getElementById('modal-bg').style.display = 'flex';
+      setTimeout(() => document.getElementById('modal-input').focus(), 100);
+    }
+
+    function openEditModal(index) {
+      pauseAll();
+      modalAction = 'edit';
+      editIndex = index;
+      document.getElementById('modal-title').textContent = 'Editar tarea';
+      document.getElementById('modal-input').value = tasks[index].name;
+      document.getElementById('modal-time').value = formatTime(tasks[index].seconds);
+      document.getElementById('modal-bg').style.display = 'flex';
+      setTimeout(() => document.getElementById('modal-input').focus(), 100);
+    }
+
+    function closeModal() {
+      document.getElementById('modal-bg').style.display = 'none';
+      modalAction = null;
+    }
+
+    function confirmModal() {
+      const name = document.getElementById('modal-input').value.trim();
+      const timeStr = document.getElementById('modal-time').value.trim();
+      if (!name) return;
+
+      const seconds = timeStr ? parseTime(timeStr) : 0;
+
+      if (modalAction === 'add') {
+        tasks.push({ name, seconds, running: true, lastStart: Date.now() });
+      } else if (modalAction === 'edit' && editIndex !== null) {
+        tasks[editIndex].name = name;
+        if (timeStr) tasks[editIndex].seconds = seconds;
+      }
+
+      closeModal();
+      saveTasks();
+    }
+
+    function clearAll() {
+      if (confirm('¿Seguro que quieres borrar todas las tareas?')) {
         tasks = [];
-        renderTasks();
+        saveTasks();
       }
     }
+
+    function saveTasks(render = true) {
+      localStorage.setItem('tasks', JSON.stringify(tasks));
+      if (render) renderTasks();
+    }
+
+    function exportCSV() {
+      let csv = 'Task,Time\n';
+      let total = 0;
+      tasks.forEach(t => {
+        csv += `${t.name},${formatTime(t.seconds)}\n`;
+        total += t.seconds;
+      });
+      csv += `Total,${formatTime(total)}`;
+
+      try {
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'myWork.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error('Error exportando el CSV:', error);
+        alert('Export fallida. Este navegador puede no soportar descargas de archivos.');
+      }
+    }
+
+    document.getElementById('addBtn').addEventListener('click', openAddModal);
+
+    document.getElementById('modal-input').addEventListener('keypress', e => {
+      if (e.key === 'Enter') {
+        confirmModal();
+      }
+    });
+
+    renderTasks();
+
+    setInterval(() => {
+      let needsSave = false;
+      tasks.forEach(task => {
+        if (task.running) {
+          task.seconds += 1;
+          needsSave = true;
+        }
+      });
+      if (needsSave) saveTasks();
+    }, 1000);
   </script>
 </body>
 </html>
