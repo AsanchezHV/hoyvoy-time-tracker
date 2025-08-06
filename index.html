@@ -6,8 +6,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Hoy Voy Time Tracker</title>
   <style>
+    @font-face {
+      font-family: 'ProximaNovaCondBlack';
+      src: url('fonts/ProximaNovaCondBlack.woff2') format('woff2');
+      font-weight: normal;
+      font-style: normal;
+    }
+    @font-face {
+      font-family: 'DINRoundPro';
+      src: url('fonts/DINRoundPro.woff') format('woff');
+      font-weight: normal;
+      font-style: normal;
+    }
+
+    * {
+      font-family: 'DINRoundPro', sans-serif;
+      box-sizing: border-box;
+    }
     body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
       margin: 2rem;
       background: #f9f9f9;
       color: #1c1c1c;
@@ -24,6 +40,7 @@
       height: 50px;
     }
     h1 {
+      font-family: 'ProximaNovaCondBlack', sans-serif;
       font-size: 1.5rem;
       color: #000;
     }
@@ -69,7 +86,7 @@
   </header>
 
   <div id="task-list"></div>
-  <button id="addTaskBtn">+ Añadir tarea</button>
+  <button id="addBtn">+ Añadir tarea</button>
   <button onclick="exportCSV()">↓ Exportar CSV</button>
   <button onclick="clearAll()">🗑 Borrar todo</button>
   <div id="total">Total: 00:00:00</div>
@@ -85,9 +102,8 @@
     }
 
     function parseTime(str) {
-      const parts = str.split(":").map(Number);
-      if (parts.length !== 3 || parts.some(isNaN)) return null;
-      return parts[0]*3600 + parts[1]*60 + parts[2];
+      const [h, m, s] = str.split(':').map(Number);
+      return h * 3600 + m * 60 + s;
     }
 
     function renderTasks() {
@@ -101,7 +117,10 @@
         const nameInput = document.createElement('input');
         nameInput.type = 'text';
         nameInput.value = task.name;
-        nameInput.oninput = (e) => { task.name = e.target.value; saveTasks(); };
+        nameInput.addEventListener('input', () => {
+          tasks[i].name = nameInput.value;
+          saveTasks(false);
+        });
 
         const timeLabel = document.createElement('span');
         timeLabel.className = 'task-time';
@@ -114,26 +133,21 @@
         const editBtn = document.createElement('button');
         editBtn.textContent = 'Editar';
         editBtn.onclick = () => {
-          const input = prompt("Introduce el tiempo (hh:mm:ss):", formatTime(task.seconds));
-          const seconds = parseTime(input);
-          if (seconds != null) {
-            task.seconds = seconds;
-            task.running = false;
-            delete task.lastStart;
+          const manual = prompt('Introduce el nuevo tiempo (hh:mm:ss):', formatTime(task.seconds));
+          if (manual && /^\d{2}:\d{2}:\d{2}$/.test(manual)) {
+            task.seconds = parseTime(manual);
             saveTasks();
-          } else {
-            alert("Formato no válido. Usa hh:mm:ss");
           }
         };
 
-        const deleteBtn = document.createElement('button');
-        deleteBtn.textContent = '❌';
-        deleteBtn.onclick = () => {
+        const delBtn = document.createElement('button');
+        delBtn.textContent = '❌';
+        delBtn.onclick = () => {
           tasks.splice(i, 1);
           saveTasks();
         };
 
-        div.append(nameInput, timeLabel, toggleBtn, editBtn, deleteBtn);
+        div.append(nameInput, timeLabel, toggleBtn, editBtn, delBtn);
         list.appendChild(div);
         total += task.seconds;
       });
@@ -167,9 +181,16 @@
       saveTasks();
     }
 
-    function saveTasks() {
+    function clearAll() {
+      if (confirm('¿Seguro que quieres borrar todas las tareas?')) {
+        tasks = [];
+        saveTasks();
+      }
+    }
+
+    function saveTasks(render = true) {
       localStorage.setItem('tasks', JSON.stringify(tasks));
-      renderTasks();
+      if (render) renderTasks();
     }
 
     function exportCSV() {
@@ -181,34 +202,33 @@
       });
       csv += `Total,${formatTime(total)}`;
 
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.setAttribute('href', url);
-      link.setAttribute('download', 'myWork.csv');
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
+      try {
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'myWork.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error('Error exportando el CSV:', error);
+        alert('Export fallida. Este navegador puede no soportar descargas de archivos.');
+      }
     }
 
-    function clearAll() {
-      tasks = [];
-      saveTasks();
-    }
-
-    document.getElementById('addTaskBtn').addEventListener('click', addTask);
+    document.getElementById('addBtn').addEventListener('click', addTask);
 
     setInterval(() => {
-      let updated = false;
-      const now = Date.now();
+      let needsSave = false;
       tasks.forEach(task => {
         if (task.running) {
           task.seconds += 1;
-          updated = true;
+          needsSave = true;
         }
       });
-      if (updated) saveTasks(); else renderTasks();
+      if (needsSave) saveTasks();
     }, 1000);
 
     renderTasks();
