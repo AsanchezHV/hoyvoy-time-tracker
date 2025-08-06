@@ -52,7 +52,7 @@
       background-color: #fff;
     }
     .task-time {
-      width: 80px;
+      width: 90px;
       text-align: center;
       font-variant-numeric: tabular-nums;
       padding: 0.3rem;
@@ -127,6 +127,7 @@
     <div id="modal">
       <h2 id="modal-title">Nueva tarea</h2>
       <input type="text" id="modal-input" placeholder="Nombre de la tarea" />
+      <input type="text" id="modal-time" placeholder="Tiempo (opcional, hh:mm:ss)" />
       <div id="modal-buttons">
         <button onclick="closeModal()">Cancelar</button>
         <button onclick="confirmModal()">Aceptar</button>
@@ -229,6 +230,7 @@
       editIndex = null;
       document.getElementById('modal-title').textContent = 'Nueva tarea';
       document.getElementById('modal-input').value = '';
+      document.getElementById('modal-time').value = '';
       document.getElementById('modal-bg').style.display = 'flex';
       setTimeout(() => document.getElementById('modal-input').focus(), 100);
     }
@@ -239,6 +241,7 @@
       editIndex = index;
       document.getElementById('modal-title').textContent = 'Editar tarea';
       document.getElementById('modal-input').value = tasks[index].name;
+      document.getElementById('modal-time').value = formatTime(tasks[index].seconds);
       document.getElementById('modal-bg').style.display = 'flex';
       setTimeout(() => document.getElementById('modal-input').focus(), 100);
     }
@@ -249,13 +252,17 @@
     }
 
     function confirmModal() {
-      const value = document.getElementById('modal-input').value.trim();
-      if (!value) return;
+      const name = document.getElementById('modal-input').value.trim();
+      const timeStr = document.getElementById('modal-time').value.trim();
+      if (!name) return;
+
+      const seconds = timeStr ? parseTime(timeStr) : 0;
 
       if (modalAction === 'add') {
-        tasks.push({ name: value, seconds: 0, running: true, lastStart: Date.now() });
+        tasks.push({ name, seconds, running: true, lastStart: Date.now() });
       } else if (modalAction === 'edit' && editIndex !== null) {
-        tasks[editIndex].name = value;
+        tasks[editIndex].name = name;
+        if (timeStr) tasks[editIndex].seconds = seconds;
       }
 
       closeModal();
@@ -301,6 +308,14 @@
 
     document.getElementById('addBtn').addEventListener('click', openAddModal);
 
+    document.getElementById('modal-input').addEventListener('keypress', e => {
+      if (e.key === 'Enter') {
+        confirmModal();
+      }
+    });
+
+    renderTasks();
+
     setInterval(() => {
       let needsSave = false;
       tasks.forEach(task => {
@@ -311,8 +326,6 @@
       });
       if (needsSave) saveTasks();
     }, 1000);
-
-    renderTasks();
   </script>
 </body>
 </html>
