@@ -60,6 +60,12 @@
       font-size: 1.2rem;
       color: #000;
     }
+    .controls {
+      margin-bottom: 1rem;
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
   </style>
 </head>
 <body>
@@ -68,13 +74,24 @@
     <img src="hoy-voy-logodibuixat-01-col.png" alt="Logo Hoy Voy" />
   </header>
 
+  <div class="controls">
+    <button onclick="addTask()">+ Añadir tarea</button>
+    <button onclick="exportCSV()">↓ Exportar CSV</button>
+    <button onclick="clearTasks()">🗑️ Borrar todo</button>
+  </div>
+
   <div id="task-list"></div>
-  <button onclick="addTask()">+ Añadir tarea</button>
-  <button onclick="exportCSV()">↓ Exportar CSV</button>
   <div id="total">Total: 00:00:00</div>
 
   <script>
-    let tasks = JSON.parse(localStorage.getItem('tasks') || '[]');
+    let tasks = [];
+
+    try {
+      tasks = JSON.parse(localStorage.getItem('tasks') || '[]');
+    } catch (e) {
+      console.error('No se pudo leer localStorage:', e);
+      tasks = [];
+    }
 
     function formatTime(seconds) {
       const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
@@ -84,64 +101,37 @@
     }
 
     function renderTasks() {
-      const activeInput = document.activeElement;
       const list = document.getElementById('task-list');
       list.innerHTML = '';
       let total = 0;
+
       tasks.forEach((task, i) => {
         const div = document.createElement('div');
         div.className = 'task';
 
         const nameInput = document.createElement('input');
         nameInput.value = task.name;
-        nameInput.dataset.index = i;
-        nameInput.oninput = (e) => {
-          task.name = e.target.value;
-          saveOnly(); // no render, solo guarda
-        };
+        nameInput.oninput = (e) => { tasks[i].name = e.target.value; saveTasks(false); };
 
         const timeLabel = document.createElement('span');
         timeLabel.className = 'task-time';
-        timeLabel.id = `time-${i}`;
         timeLabel.textContent = formatTime(task.seconds);
+        timeLabel.id = 'time-' + i;
 
         const toggleBtn = document.createElement('button');
         toggleBtn.textContent = task.running ? 'Pausar' : 'Iniciar';
         toggleBtn.onclick = () => toggleTimer(i);
 
-        div.append(nameInput, timeLabel, toggleBtn);
+        const deleteBtn = document.createElement('button');
+        deleteBtn.textContent = '❌';
+        deleteBtn.onclick = () => { tasks.splice(i, 1); saveTasks(); };
+
+        div.append(nameInput, timeLabel, toggleBtn, deleteBtn);
         list.appendChild(div);
+
         total += task.seconds;
       });
-      document.getElementById('total').textContent = 'Total: ' + formatTime(total);
-    }
 
-    function saveOnly() {
-      localStorage.setItem('tasks', JSON.stringify(tasks));
-    }
-      const list = document.getElementById('task-list');
-      list.innerHTML = '';
-      let total = 0;
-      tasks.forEach((task, i) => {
-        const div = document.createElement('div');
-        div.className = 'task';
-
-        const nameInput = document.createElement('input');
-        nameInput.value = task.name;
-        nameInput.onchange = (e) => { task.name = e.target.value; saveTasks(); };
-
-        const timeLabel = document.createElement('span');
-        timeLabel.className = 'task-time';
-        timeLabel.textContent = formatTime(task.seconds);
-
-        const toggleBtn = document.createElement('button');
-        toggleBtn.textContent = task.running ? 'Pausar' : 'Iniciar';
-        toggleBtn.onclick = () => toggleTimer(i);
-
-        div.append(nameInput, timeLabel, toggleBtn);
-        list.appendChild(div);
-        total += task.seconds;
-      });
       document.getElementById('total').textContent = 'Total: ' + formatTime(total);
     }
 
@@ -172,16 +162,29 @@
       saveTasks();
     }
 
-    function saveTasks() {
-      localStorage.setItem('tasks', JSON.stringify(tasks));
-      renderTasks();
+    function clearTasks() {
+      if (confirm('¿Seguro que quieres borrar todas las tareas?')) {
+        tasks = [];
+        saveTasks();
+      }
+    }
+
+    function saveTasks(rerender = true) {
+      try {
+        localStorage.setItem('tasks', JSON.stringify(tasks));
+      } catch (e) {
+        console.warn('No se pudo guardar en localStorage');
+      }
+      if (rerender) renderTasks();
     }
 
     function exportCSV() {
-      let csv = 'Task,Time\n';
+      let csv = 'Task,Time
+';
       let total = 0;
       tasks.forEach(t => {
-        csv += `${t.name},${formatTime(t.seconds)}\n`;
+        csv += `${t.name},${formatTime(t.seconds)}
+`;
         total += t.seconds;
       });
       csv += `Total,${formatTime(total)}`;
@@ -203,12 +206,14 @@
     }
 
     setInterval(() => {
-      tasks.forEach(task => {
+      const now = Date.now();
+      tasks.forEach((task, i) => {
         if (task.running) {
-          task.seconds += 1;
+          const elapsed = Math.floor((now - (task.lastStart || now)) / 1000);
+          const timeElem = document.getElementById('time-' + i);
+          if (timeElem) timeElem.textContent = formatTime(task.seconds + elapsed);
         }
       });
-      saveTasks();
     }, 1000);
 
     renderTasks();
