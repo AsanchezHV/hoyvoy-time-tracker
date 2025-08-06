@@ -52,8 +52,8 @@
       background-color: #fff;
     }
     .task-time {
-      width: 90px;
-      text-align: right;
+      width: 80px;
+      text-align: center;
       font-variant-numeric: tabular-nums;
       padding: 0.3rem;
       border: 1px solid #000;
@@ -104,7 +104,7 @@
       return h * 3600 + m * 60 + s;
     }
 
-    function pauseAllTimers() {
+    function pauseAll() {
       const now = Date.now();
       tasks.forEach(task => {
         if (task.running) {
@@ -126,26 +126,12 @@
         const nameInput = document.createElement('input');
         nameInput.type = 'text';
         nameInput.value = task.name;
-        nameInput.addEventListener('input', () => {
-          tasks[i].name = nameInput.value;
-          saveTasks(false);
-        });
-        nameInput.addEventListener('keydown', e => {
-          if (e.key === 'Enter') {
-            pauseAllTimers();
-            toggleTimer(i);
-          }
-        });
+        nameInput.readOnly = true;
 
         const timeInput = document.createElement('input');
         timeInput.className = 'task-time';
         timeInput.value = formatTime(task.seconds);
-        timeInput.addEventListener('change', () => {
-          if (/^\d{2}:\d{2}:\d{2}$/.test(timeInput.value)) {
-            task.seconds = parseTime(timeInput.value);
-            saveTasks();
-          }
-        });
+        timeInput.readOnly = true;
 
         const toggleBtn = document.createElement('button');
         toggleBtn.textContent = task.running ? '⏸️' : '▶️';
@@ -153,10 +139,7 @@
 
         const editBtn = document.createElement('button');
         editBtn.textContent = '✏️';
-        editBtn.onclick = () => {
-          pauseAllTimers();
-          nameInput.focus();
-        };
+        editBtn.onclick = () => editTask(i);
 
         const resetBtn = document.createElement('button');
         resetBtn.textContent = '🔄';
@@ -181,35 +164,38 @@
 
     function toggleTimer(index) {
       const now = Date.now();
-      tasks = tasks.map((task, i) => {
-        if (i === index) {
-          if (!task.running) {
-            task.running = true;
-            task.lastStart = now;
-          } else {
-            task.running = false;
-            task.seconds += Math.floor((now - task.lastStart) / 1000);
-            delete task.lastStart;
-          }
-        } else if (task.running) {
-          task.seconds += Math.floor((now - task.lastStart) / 1000);
-          task.running = false;
-          delete task.lastStart;
-        }
-        return task;
-      });
+      const task = tasks[index];
+      if (task.running) {
+        task.seconds += Math.floor((now - task.lastStart) / 1000);
+        task.running = false;
+        delete task.lastStart;
+      } else {
+        task.lastStart = now;
+        task.running = true;
+      }
+      saveTasks();
+    }
+
+    function editTask(i) {
+      pauseAll();
+      const newName = prompt("Nuevo nombre de la tarea:", tasks[i].name);
+      if (newName !== null) tasks[i].name = newName;
+
+      const newTime = prompt("Nuevo tiempo (HH:MM:SS):", formatTime(tasks[i].seconds));
+      if (newTime && /^\d{2}:\d{2}:\d{2}$/.test(newTime)) {
+        tasks[i].seconds = parseTime(newTime);
+      }
+
       saveTasks();
     }
 
     function addTask() {
-      pauseAllTimers();
-      tasks.push({ name: '', seconds: 0, running: false });
-      saveTasks();
-      setTimeout(() => {
-        const inputs = document.querySelectorAll('#task-list input[type=text]');
-        const last = inputs[inputs.length - 1];
-        if (last) last.focus();
-      }, 0);
+      pauseAll();
+      const name = prompt("Nombre de la tarea:");
+      if (name) {
+        tasks.push({ name, seconds: 0, running: true, lastStart: Date.now() });
+        saveTasks();
+      }
     }
 
     function clearAll() {
