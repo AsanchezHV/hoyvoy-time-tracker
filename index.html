@@ -8,14 +8,10 @@
     @font-face {
       font-family: 'ProximaNovaCondBlack';
       src: url('fonts/ProximaNovaCondBlack.woff2') format('woff2');
-      font-weight: normal;
-      font-style: normal;
     }
     @font-face {
       font-family: 'DINRoundPro';
       src: url('fonts/DINRoundPro.woff') format('woff');
-      font-weight: normal;
-      font-style: normal;
     }
 
     * {
@@ -49,12 +45,17 @@
       gap: 0.5rem;
       margin: 0.5rem 0;
     }
-    .task input[type="text"] {
+    .task input[type="text"], .task input[type="time"] {
       flex: 1;
       padding: 0.3rem;
       border: 1px solid #000;
       border-radius: 4px;
       background-color: #fff;
+    }
+    .task-time {
+      min-width: 100px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
     }
     button {
       padding: 0.3rem 0.6rem;
@@ -64,20 +65,6 @@
       border: none;
       border-radius: 4px;
       font-weight: bold;
-    }
-    .icon-btn {
-      font-size: 1rem;
-      padding: 0.3rem;
-      width: 30px;
-      height: 30px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .task-time {
-      min-width: 100px;
-      text-align: right;
-      font-variant-numeric: tabular-nums;
     }
     #total {
       margin-top: 1rem;
@@ -118,6 +105,7 @@
       const list = document.getElementById('task-list');
       list.innerHTML = '';
       let total = 0;
+
       tasks.forEach((task, i) => {
         const div = document.createElement('div');
         div.className = 'task';
@@ -125,38 +113,45 @@
         const nameInput = document.createElement('input');
         nameInput.type = 'text';
         nameInput.value = task.name;
-        nameInput.disabled = true;
+        nameInput.disabled = !task.editing;
         nameInput.addEventListener('keydown', (e) => {
           if (e.key === 'Enter') {
-            nameInput.disabled = true;
-            tasks[i].name = nameInput.value;
+            task.name = nameInput.value;
+            task.editing = false;
+            task.running = true;
+            task.lastStart = Date.now();
+            stopOtherTasks(i);
             saveTasks();
           }
         });
 
-        const timeLabel = document.createElement('span');
-        timeLabel.className = 'task-time';
-        timeLabel.textContent = formatTime(task.seconds);
+        const timeInput = document.createElement('input');
+        timeInput.type = 'text';
+        timeInput.className = 'task-time';
+        timeInput.value = formatTime(task.seconds);
+        timeInput.disabled = !task.editing;
+        timeInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            if (/^\d{2}:\d{2}:\d{2}$/.test(timeInput.value)) {
+              task.seconds = parseTime(timeInput.value);
+              task.editing = false;
+              saveTasks();
+            }
+          }
+        });
 
         const toggleBtn = document.createElement('button');
-        toggleBtn.textContent = task.running ? 'Pausar' : 'Iniciar';
+        toggleBtn.textContent = task.running ? '⏸' : '▶';
         toggleBtn.onclick = () => toggleTimer(i);
 
         const editBtn = document.createElement('button');
-        editBtn.className = 'icon-btn';
         editBtn.textContent = '✏️';
         editBtn.onclick = () => {
-          nameInput.disabled = false;
-          nameInput.focus();
-          const manual = prompt('Introduce el nuevo tiempo (hh:mm:ss):', formatTime(task.seconds));
-          if (manual && /^\d{2}:\d{2}:\d{2}$/.test(manual)) {
-            task.seconds = parseTime(manual);
-            saveTasks();
-          }
+          task.editing = !task.editing;
+          saveTasks();
         };
 
         const resetBtn = document.createElement('button');
-        resetBtn.className = 'icon-btn';
         resetBtn.textContent = '🔄';
         resetBtn.onclick = () => {
           task.seconds = 0;
@@ -170,11 +165,24 @@
           saveTasks();
         };
 
-        div.append(nameInput, timeLabel, toggleBtn, editBtn, resetBtn, delBtn);
+        div.append(nameInput, timeInput, toggleBtn, editBtn, resetBtn, delBtn);
         list.appendChild(div);
         total += task.seconds;
       });
+
       document.getElementById('total').textContent = 'Total: ' + formatTime(total);
+    }
+
+    function stopOtherTasks(currentIndex) {
+      const now = Date.now();
+      tasks = tasks.map((task, i) => {
+        if (i !== currentIndex && task.running) {
+          task.running = false;
+          task.seconds += Math.floor((now - task.lastStart) / 1000);
+          delete task.lastStart;
+        }
+        return task;
+      });
     }
 
     function toggleTimer(index) {
@@ -184,15 +192,12 @@
           if (!task.running) {
             task.running = true;
             task.lastStart = now;
+            stopOtherTasks(i);
           } else {
             task.running = false;
             task.seconds += Math.floor((now - task.lastStart) / 1000);
             delete task.lastStart;
           }
-        } else if (task.running) {
-          task.seconds += Math.floor((now - task.lastStart) / 1000);
-          task.running = false;
-          delete task.lastStart;
         }
         return task;
       });
@@ -200,24 +205,8 @@
     }
 
     function addTask() {
-      const newTask = { name: '', seconds: 0, running: true, lastStart: Date.now() };
-      tasks.forEach(t => {
-        if (t.running) {
-          t.seconds += Math.floor((Date.now() - t.lastStart) / 1000);
-          t.running = false;
-          delete t.lastStart;
-        }
-      });
-      tasks.push(newTask);
+      tasks.push({ name: '', seconds: 0, running: false, editing: true });
       saveTasks();
-      setTimeout(() => {
-        const inputs = document.querySelectorAll('#task-list input[type="text"]');
-        const lastInput = inputs[inputs.length - 1];
-        if (lastInput) {
-          lastInput.disabled = false;
-          lastInput.focus();
-        }
-      }, 100);
     }
 
     function clearAll() {
@@ -241,29 +230,26 @@
       });
       csv += `Total,${formatTime(total)}`;
 
-      try {
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.setAttribute('href', url);
-        link.setAttribute('download', 'myWork.csv');
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      } catch (error) {
-        console.error('Error exportando el CSV:', error);
-        alert('Export fallida. Este navegador puede no soportar descargas de archivos.');
-      }
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'myWork.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     }
 
     document.getElementById('addBtn').addEventListener('click', addTask);
 
     setInterval(() => {
       let needsSave = false;
+      const now = Date.now();
       tasks.forEach(task => {
-        if (task.running) {
+        if (task.running && task.lastStart) {
           task.seconds += 1;
+          task.lastStart = now;
           needsSave = true;
         }
       });
