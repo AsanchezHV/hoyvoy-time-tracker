@@ -1,0 +1,182 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hoy Voy Time Tracker</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      margin: 2rem;
+      background: #f9f9f9;
+      color: #1c1c1c;
+    }
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 4px solid #000;
+      padding-bottom: 1rem;
+      margin-bottom: 2rem;
+    }
+    header img {
+      height: 50px;
+    }
+    h1 {
+      font-size: 1.5rem;
+      color: #000;
+    }
+    .task {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin: 0.5rem 0;
+    }
+    .task input {
+      flex: 1;
+      padding: 0.3rem;
+      border: 1px solid #000;
+      border-radius: 4px;
+      background-color: #fff;
+    }
+    button {
+      padding: 0.3rem 0.6rem;
+      cursor: pointer;
+      background-color: #000;
+      color: #fff200;
+      border: none;
+      border-radius: 4px;
+      font-weight: bold;
+    }
+    .task-time {
+      min-width: 100px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+    #total {
+      margin-top: 1rem;
+      font-weight: bold;
+      font-size: 1.2rem;
+      color: #000;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Hoy Voy Time Tracker</h1>
+    <img src="hoy-voy-logodibuixat-01-col.png" alt="Logo Hoy Voy" />
+  </header>
+
+  <div id="task-list"></div>
+  <button onclick="addTask()">+ Añadir tarea</button>
+  <button onclick="exportCSV()">↓ Exportar CSV</button>
+  <div id="total">Total: 00:00:00</div>
+
+  <script>
+    let tasks = JSON.parse(localStorage.getItem('tasks') || '[]');
+
+    function formatTime(seconds) {
+      const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
+      const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+      const s = String(seconds % 60).padStart(2, '0');
+      return `${h}:${m}:${s}`;
+    }
+
+    function renderTasks() {
+      const list = document.getElementById('task-list');
+      list.innerHTML = '';
+      let total = 0;
+      tasks.forEach((task, i) => {
+        const div = document.createElement('div');
+        div.className = 'task';
+
+        const nameInput = document.createElement('input');
+        nameInput.value = task.name;
+        nameInput.onchange = (e) => { task.name = e.target.value; saveTasks(); };
+
+        const timeLabel = document.createElement('span');
+        timeLabel.className = 'task-time';
+        timeLabel.textContent = formatTime(task.seconds);
+
+        const toggleBtn = document.createElement('button');
+        toggleBtn.textContent = task.running ? 'Pausar' : 'Iniciar';
+        toggleBtn.onclick = () => toggleTimer(i);
+
+        div.append(nameInput, timeLabel, toggleBtn);
+        list.appendChild(div);
+        total += task.seconds;
+      });
+      document.getElementById('total').textContent = 'Total: ' + formatTime(total);
+    }
+
+    function toggleTimer(index) {
+      const now = Date.now();
+      tasks = tasks.map((task, i) => {
+        if (i === index) {
+          if (!task.running) {
+            task.running = true;
+            task.lastStart = now;
+          } else {
+            task.running = false;
+            task.seconds += Math.floor((now - task.lastStart) / 1000);
+            delete task.lastStart;
+          }
+        } else if (task.running) {
+          task.seconds += Math.floor((now - task.lastStart) / 1000);
+          task.running = false;
+          delete task.lastStart;
+        }
+        return task;
+      });
+      saveTasks();
+    }
+
+    function addTask() {
+      tasks.push({ name: '', seconds: 0, running: false });
+      saveTasks();
+    }
+
+    function saveTasks() {
+      localStorage.setItem('tasks', JSON.stringify(tasks));
+      renderTasks();
+    }
+
+    function exportCSV() {
+      let csv = 'Task,Time\n';
+      let total = 0;
+      tasks.forEach(t => {
+        csv += `${t.name},${formatTime(t.seconds)}\n`;
+        total += t.seconds;
+      });
+      csv += `Total,${formatTime(total)}`;
+
+      try {
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'myWork.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } catch (error) {
+        console.error('Error exportando el CSV:', error);
+        alert('Export fallida. Este navegador puede no soportar descargas de archivos.');
+      }
+    }
+
+    setInterval(() => {
+      tasks.forEach(task => {
+        if (task.running) {
+          task.seconds += 1;
+        }
+      });
+      saveTasks();
+    }, 1000);
+
+    renderTasks();
+  </script>
+</body>
+</html>
