@@ -69,9 +69,9 @@
   </header>
 
   <div id="task-list"></div>
-  <button id="add-task">+ Añadir tarea</button>
-  <button id="export-csv">↓ Exportar CSV</button>
-  <button id="clear-all">🗑 Borrar todo</button>
+  <button onclick="addTask()">+ Añadir tarea</button>
+  <button onclick="exportCSV()">↓ Exportar CSV</button>
+  <button onclick="clearAll()">🗑️ Borrar todo</button>
   <div id="total">Total: 00:00:00</div>
 
   <script>
@@ -94,11 +94,15 @@
 
         const nameInput = document.createElement('input');
         nameInput.value = task.name;
-        nameInput.onchange = (e) => { task.name = e.target.value; saveTasks(); };
+        nameInput.oninput = (e) => {
+          tasks[i].name = e.target.value;
+          saveTasks(false);
+        };
 
         const timeLabel = document.createElement('span');
         timeLabel.className = 'task-time';
         timeLabel.textContent = formatTime(task.seconds);
+        timeLabel.id = `task-time-${i}`;
 
         const toggleBtn = document.createElement('button');
         toggleBtn.textContent = task.running ? 'Pausar' : 'Iniciar';
@@ -106,13 +110,27 @@
 
         const delBtn = document.createElement('button');
         delBtn.textContent = '❌';
-        delBtn.onclick = () => removeTask(i);
+        delBtn.onclick = () => deleteTask(i);
 
         div.append(nameInput, timeLabel, toggleBtn, delBtn);
         list.appendChild(div);
         total += task.seconds;
       });
       document.getElementById('total').textContent = 'Total: ' + formatTime(total);
+    }
+
+    function updateTimes() {
+      let total = 0;
+      tasks.forEach((task, i) => {
+        if (task.running) {
+          task.seconds += 1;
+        }
+        const timeLabel = document.getElementById(`task-time-${i}`);
+        if (timeLabel) timeLabel.textContent = formatTime(task.seconds);
+        total += task.seconds;
+      });
+      document.getElementById('total').textContent = 'Total: ' + formatTime(total);
+      saveTasks(false);
     }
 
     function toggleTimer(index) {
@@ -142,20 +160,21 @@
       saveTasks();
     }
 
-    function removeTask(index) {
+    function deleteTask(index) {
       tasks.splice(index, 1);
       saveTasks();
     }
 
     function clearAll() {
-      tasks = [];
-      localStorage.removeItem('tasks');
-      renderTasks();
+      if (confirm('¿Borrar todas las tareas?')) {
+        tasks = [];
+        saveTasks();
+      }
     }
 
-    function saveTasks() {
+    function saveTasks(rerender = true) {
       localStorage.setItem('tasks', JSON.stringify(tasks));
-      renderTasks();
+      if (rerender) renderTasks();
     }
 
     function exportCSV() {
@@ -183,20 +202,7 @@
       }
     }
 
-    setInterval(() => {
-      tasks.forEach(task => {
-        if (task.running) {
-          task.seconds += 1;
-        }
-      });
-      saveTasks();
-    }, 1000);
-
-    // Enlazamos eventos de los botones
-    document.getElementById('add-task').onclick = addTask;
-    document.getElementById('export-csv').onclick = exportCSV;
-    document.getElementById('clear-all').onclick = clearAll;
-
+    setInterval(updateTimes, 1000);
     renderTasks();
   </script>
 </body>
