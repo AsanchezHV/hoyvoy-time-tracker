@@ -151,7 +151,7 @@
   <div id="modal-bg">
     <div id="modal">
       <h2 id="modal-title">Nueva tarea</h2>
-      <input type="text" id="modal-input" placeholder="Nombre de la tarea" />
+      <input type="text" id="modal-input" placeholder="Nombre de la tarea" onkeydown="if(event.key==='Enter'){confirmModal()}"/>
       <input type="text" id="modal-time" placeholder="Tiempo (opcional, hh:mm:ss)" />
       <div id="modal-buttons">
         <button onclick="closeModal()">Cancelar</button>
@@ -171,7 +171,50 @@
   </div>
 
   <script>
-    // ... todo el JS igual hasta reemplazar la función clearAll por:
+    let tasks = [];
+    let editingIndex = null;
+    let runningTimers = new Set();
+
+    function openModal(index = null) {
+      editingIndex = index;
+      document.getElementById('modal-title').textContent = index === null ? 'Nueva tarea' : 'Editar tarea';
+      document.getElementById('modal-input').value = index === null ? '' : tasks[index].name;
+      document.getElementById('modal-time').value = index === null ? '' : tasks[index].time;
+      document.getElementById('modal-bg').style.display = 'flex';
+    }
+
+    function closeModal() {
+      document.getElementById('modal-bg').style.display = 'none';
+    }
+
+    function confirmModal() {
+      const name = document.getElementById('modal-input').value.trim();
+      const time = document.getElementById('modal-time').value.trim();
+      if (!name) return;
+
+      if (editingIndex === null) {
+        tasks.push({ name, time: time || '00:00:00', seconds: timeToSeconds(time) || 0, running: true, lastStart: Date.now() });
+      } else {
+        tasks[editingIndex].name = name;
+        if (time) {
+          tasks[editingIndex].time = time;
+          tasks[editingIndex].seconds = timeToSeconds(time);
+        }
+      }
+      closeModal();
+      saveTasks();
+    }
+
+    function timeToSeconds(t) {
+      const parts = t.split(':').map(Number);
+      return (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
+    }
+
+    function saveTasks() {
+      localStorage.setItem('tasks', JSON.stringify(tasks));
+      location.reload();
+    }
+
     function openConfirm() {
       document.getElementById('confirm-bg').style.display = 'flex';
     }
@@ -183,6 +226,8 @@
       saveTasks();
       closeConfirm();
     }
+
+    document.getElementById('addBtn').addEventListener('click', () => openModal());
   </script>
 </body>
 </html>
