@@ -121,6 +121,7 @@
   <button id="addBtn">+ Añadir tarea</button>
   <button onclick="exportCSV()">↓ Exportar CSV</button>
   <button onclick="openConfirm()">🗑 Borrar todo</button>
+  <button onclick="pauseAll()">⏸ Pausar todo</button>
   <div id="total">Total: 00:00:00</div>
 
   <div id="modal-bg">
@@ -220,6 +221,18 @@
         task.lastStart = now;
         task.running = true;
       }
+      saveTasks();
+    }
+
+    function pauseAll() {
+      const now = Date.now();
+      tasks.forEach(task => {
+        if (task.running) {
+          task.seconds += Math.floor((now - task.lastStart) / 1000);
+          task.running = false;
+          delete task.lastStart;
+        }
+      });
       saveTasks();
     }
 
