@@ -75,7 +75,7 @@
       font-size: 1.2rem;
       color: #000;
     }
-    #modal-bg {
+    #modal-bg, #confirm-bg {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
       background: rgba(0,0,0,0.6);
@@ -84,7 +84,7 @@
       align-items: center;
       z-index: 999;
     }
-    #modal {
+    #modal, #confirm-box {
       background: white;
       padding: 2rem;
       border-radius: 8px;
@@ -92,7 +92,7 @@
       width: 100%;
       box-shadow: 0 0 20px rgba(0,0,0,0.2);
     }
-    #modal h2 {
+    #modal h2, #confirm-box p {
       margin-top: 0;
       font-family: 'ProximaNovaCondBlack';
     }
@@ -104,7 +104,7 @@
       border: 1px solid #000;
       border-radius: 4px;
     }
-    #modal-buttons {
+    #modal-buttons, #confirm-buttons {
       display: flex;
       justify-content: flex-end;
       gap: 0.5rem;
@@ -120,7 +120,7 @@
   <div id="task-list"></div>
   <button id="addBtn">+ Añadir tarea</button>
   <button onclick="exportCSV()">↓ Exportar CSV</button>
-  <button onclick="clearAll()">🗑 Borrar todo</button>
+  <button onclick="openConfirm()">🗑 Borrar todo</button>
   <div id="total">Total: 00:00:00</div>
 
   <div id="modal-bg">
@@ -129,8 +129,18 @@
       <input type="text" id="modal-input" placeholder="Nombre de la tarea" />
       <input type="text" id="modal-time" placeholder="Tiempo (opcional, hh:mm:ss)" />
       <div id="modal-buttons">
-        <button onclick="closeModal()">Cancelar</button>
-        <button onclick="confirmModal()">Aceptar</button>
+        <button id="cancelBtn">Cancelar</button>
+        <button id="confirmBtn">Aceptar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="confirm-bg">
+    <div id="confirm-box">
+      <p>¿Seguro que quieres borrar todas las tareas?</p>
+      <div id="confirm-buttons">
+        <button onclick="closeConfirm()">Cancelar</button>
+        <button onclick="confirmClear()">Aceptar</button>
       </div>
     </div>
   </div>
@@ -149,7 +159,7 @@
 
     function parseTime(str) {
       const [h, m, s] = str.split(':').map(Number);
-      return h * 3600 + m * 60 + s;
+      return (h || 0) * 3600 + (m || 0) * 60 + (s || 0);
     }
 
     function pauseAll() {
@@ -218,6 +228,7 @@
         task.running = false;
         delete task.lastStart;
       } else {
+        pauseAll();
         task.lastStart = now;
         task.running = true;
       }
@@ -270,10 +281,21 @@
     }
 
     function clearAll() {
-      if (confirm('¿Seguro que quieres borrar todas las tareas?')) {
-        tasks = [];
-        saveTasks();
-      }
+      openConfirm();
+    }
+
+    function openConfirm() {
+      document.getElementById('confirm-bg').style.display = 'flex';
+    }
+
+    function closeConfirm() {
+      document.getElementById('confirm-bg').style.display = 'none';
+    }
+
+    function confirmClear() {
+      tasks = [];
+      saveTasks();
+      closeConfirm();
     }
 
     function saveTasks(render = true) {
@@ -295,32 +317,34 @@
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.setAttribute('href', url);
-        link.setAttribute('download', 'myWork.csv');
+        link.setAttribute('download', 'HoyVoyTime.csv');
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
       } catch (error) {
-        console.error('Error exportando el CSV:', error);
-        alert('Export fallida. Este navegador puede no soportar descargas de archivos.');
+        console.error('Error exportando CSV:', error);
+        alert('Error al exportar. Tu navegador puede no soportar descargas.');
       }
     }
 
     document.getElementById('addBtn').addEventListener('click', openAddModal);
+    document.getElementById('cancelBtn').addEventListener('click', closeModal);
+    document.getElementById('confirmBtn').addEventListener('click', confirmModal);
 
-    document.getElementById('modal-input').addEventListener('keypress', e => {
-      if (e.key === 'Enter') {
-        confirmModal();
-      }
+    document.getElementById('modal-input').addEventListener('keydown', e => {
+      if (e.key === 'Enter') confirmModal();
+    });
+    document.getElementById('modal-time').addEventListener('keydown', e => {
+      if (e.key === 'Enter') confirmModal();
     });
 
     renderTasks();
-
     setInterval(() => {
       let needsSave = false;
       tasks.forEach(task => {
         if (task.running) {
-          task.seconds += 1;
+          task.seconds++;
           needsSave = true;
         }
       });
