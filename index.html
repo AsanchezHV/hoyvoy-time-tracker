@@ -40,11 +40,6 @@
       border-radius: 4px;
       background-color: #fff;
     }
-    .task-time {
-      min-width: 100px;
-      text-align: right;
-      font-variant-numeric: tabular-nums;
-    }
     button {
       padding: 0.3rem 0.6rem;
       cursor: pointer;
@@ -54,9 +49,10 @@
       border-radius: 4px;
       font-weight: bold;
     }
-    .delete-btn {
-      background-color: #000;
-      color: red;
+    .task-time {
+      min-width: 100px;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
     }
     #total {
       margin-top: 1rem;
@@ -73,9 +69,9 @@
   </header>
 
   <div id="task-list"></div>
-  <button onclick="addTask()">+ Añadir tarea</button>
+  <button id="addTaskBtn">+ Añadir tarea</button>
   <button onclick="exportCSV()">↓ Exportar CSV</button>
-  <button onclick="clearTasks()">🗑️ Borrar todo</button>
+  <button onclick="clearAll()">🗑 Borrar todo</button>
   <div id="total">Total: 00:00:00</div>
 
   <script>
@@ -89,8 +85,9 @@
     }
 
     function parseTime(str) {
-      const [h, m, s] = str.split(':').map(n => parseInt(n) || 0);
-      return h * 3600 + m * 60 + s;
+      const parts = str.split(":").map(Number);
+      if (parts.length !== 3 || parts.some(isNaN)) return null;
+      return parts[0]*3600 + parts[1]*60 + parts[2];
     }
 
     function renderTasks() {
@@ -104,7 +101,7 @@
         const nameInput = document.createElement('input');
         nameInput.type = 'text';
         nameInput.value = task.name;
-        nameInput.oninput = (e) => { tasks[i].name = e.target.value; saveTasks(false); };
+        nameInput.oninput = (e) => { task.name = e.target.value; saveTasks(); };
 
         const timeLabel = document.createElement('span');
         timeLabel.className = 'task-time';
@@ -117,19 +114,23 @@
         const editBtn = document.createElement('button');
         editBtn.textContent = 'Editar';
         editBtn.onclick = () => {
-          const nuevo = prompt('Nuevo tiempo (hh:mm:ss):', formatTime(task.seconds));
-          if (nuevo) {
-            tasks[i].seconds = parseTime(nuevo);
-            saveTasks(false);
+          const input = prompt("Introduce el tiempo (hh:mm:ss):", formatTime(task.seconds));
+          const seconds = parseTime(input);
+          if (seconds != null) {
+            task.seconds = seconds;
+            task.running = false;
+            delete task.lastStart;
+            saveTasks();
+          } else {
+            alert("Formato no válido. Usa hh:mm:ss");
           }
         };
 
         const deleteBtn = document.createElement('button');
         deleteBtn.textContent = '❌';
-        deleteBtn.className = 'delete-btn';
         deleteBtn.onclick = () => {
           tasks.splice(i, 1);
-          saveTasks(false);
+          saveTasks();
         };
 
         div.append(nameInput, timeLabel, toggleBtn, editBtn, deleteBtn);
@@ -158,60 +159,56 @@
         }
         return task;
       });
-      saveTasks(false);
+      saveTasks();
     }
 
     function addTask() {
       tasks.push({ name: '', seconds: 0, running: false });
-      saveTasks(false);
+      saveTasks();
     }
 
-    function clearTasks() {
-      if (confirm('¿Estás seguro de borrar todas las tareas?')) {
-        tasks = [];
-        saveTasks(false);
-      }
-    }
-
-    function saveTasks(update = true) {
+    function saveTasks() {
       localStorage.setItem('tasks', JSON.stringify(tasks));
-      if (update) renderTasks();
+      renderTasks();
     }
 
     function exportCSV() {
-      let csv = 'Task,Time
-';
+      let csv = 'Task,Time\n';
       let total = 0;
       tasks.forEach(t => {
-        csv += `${t.name},${formatTime(t.seconds)}
-`;
+        csv += `${t.name},${formatTime(t.seconds)}\n`;
         total += t.seconds;
       });
       csv += `Total,${formatTime(total)}`;
 
-      try {
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.setAttribute('href', url);
-        link.setAttribute('download', 'myWork.csv');
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      } catch (error) {
-        console.error('Error exportando el CSV:', error);
-        alert('Export fallida. Este navegador puede no soportar descargas de archivos.');
-      }
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.setAttribute('href', url);
+      link.setAttribute('download', 'myWork.csv');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     }
 
+    function clearAll() {
+      tasks = [];
+      saveTasks();
+    }
+
+    document.getElementById('addTaskBtn').addEventListener('click', addTask);
+
     setInterval(() => {
+      let updated = false;
+      const now = Date.now();
       tasks.forEach(task => {
         if (task.running) {
           task.seconds += 1;
+          updated = true;
         }
       });
-      saveTasks();
+      if (updated) saveTasks(); else renderTasks();
     }, 1000);
 
     renderTasks();
